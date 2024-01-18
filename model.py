@@ -7,30 +7,33 @@ import pandas as pd
 import numpy as np
 import cv2
 from sklearn.model_selection import train_test_split
-from preprocessing import Preprocessor
+from preprocessing import Preprocessor, Old_Preprocessor
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
-annotations_path = r'annotations.csv'
-images_dir = r'./Images'
+annotations_path = 'annotations.csv'
+images_dir = './Images'
 annotations = pd.read_csv(annotations_path)
 
 data = []
 for index, row in annotations.iterrows():
     for fundus in ['Left_Fundus', 'Right_Fundus']:
         img_path = f"{images_dir}/{row[fundus]}"  
-        processed_image = Preprocessor(img_path)
+        processed_image = Old_Preprocessor(img_path)
         if processed_image is not None:
             data.append((processed_image, row['Age']))
+print("Finished appending")
 
 X = np.array([i[0] for i in data]).reshape(-1, 256, 256, 1)  
 y = np.array([i[1] for i in data])
 
-from sklearn.model_selection import train_test_split
+# Splitting Training, Testing and Validation
+print("Splitting data")
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.12, random_state=42)
 X_val, X_test, y_val, y_test = train_test_split(X_test, y_test, test_size=(10/12), random_state=42)
 
+#Model Setup
 X_train_tensor = torch.tensor(X_train).float().to(device)
 y_train_tensor = torch.tensor(y_train).float().to(device)
 X_val_tensor = torch.tensor(X_val).float().to(device)
@@ -75,7 +78,8 @@ model = CNNModel().to(device)
 optimizer = optim.Adam(model.parameters(), lr=0.001)
 criterion = nn.MSELoss()
 
-num_epochs = 10  #
+# Training
+num_epochs = 100  #
 for epoch in range(num_epochs):
     model.train()
     total_train_loss = 0
@@ -93,26 +97,25 @@ for epoch in range(num_epochs):
 
         total_train_loss += loss.item()
         
-model.eval()
-total_val_loss = 0
-with torch.no_grad():
-    for images, ages in val_loader:
-        images, ages = images.to(device), ages.to(device)
-        outputs = model(images)
-        loss = criterion(outputs, ages.view(-1, 1))
-        total_val_loss += loss.item()
+        model.eval()
+    total_val_loss = 0
+    with torch.no_grad():
+        for images, ages in val_loader:
+            images, ages = images.to(device), ages.to(device)
+            outputs = model(images)
+            loss = criterion(outputs, ages.view(-1, 1))
+            total_val_loss += loss.item()
 
-print(f"Epoch [{epoch+1}/{num_epochs}], "
-        f"Train Loss: {total_train_loss / len(train_loader):.4f}, "
-        f"Validation Loss: {total_val_loss / len(val_loader):.4f}")
+    print(f"Epoch [{epoch+1}/{num_epochs}], "
+            f"Train Loss: {total_train_loss / len(train_loader):.4f}, "
+            f"Validation Loss: {total_val_loss / len(val_loader):.4f}")
+    model.eval()
+    total_test_loss = 0
+    with torch.no_grad():
+        for images, ages in test_loader:
+            images, ages = images.to(device), ages.to(device)
+            outputs = model(images)
+            loss = criterion(outputs, ages.view(-1, 1))
+            total_test_loss += loss.item()
 
-model.eval()
-total_test_loss = 0
-with torch.no_grad():
-    for images, ages in test_loader:
-        images, ages = images.to(device), ages.to(device)
-        outputs = model(images)
-        loss = criterion(outputs, ages.view(-1, 1))
-        total_test_loss += loss.item()
-
-print(f"Test Loss: {total_test_loss / len(test_loader):.4f}")
+    print(f"Test Loss: {total_test_loss / len(test_loader):.4f}")
