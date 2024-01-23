@@ -57,25 +57,30 @@ val_loader = DataLoader(val_dataset, batch_size=32)
 test_loader = DataLoader(test_dataset, batch_size=32)
 print("Preparing to train")
 
+# Model with Dropout
 class CNNModel(nn.Module):
     def __init__(self):
         super(CNNModel, self).__init__()
         self.conv1 = nn.Conv2d(1, 32, kernel_size=3, padding=1)
         self.relu = nn.ReLU()
         self.pool = nn.MaxPool2d(2)
+        self.dropout = nn.Dropout(0.5)
         self.flatten = nn.Flatten()
         self.fc1 = nn.Linear(32 * 128 * 128, 128)  
         self.fc2 = nn.Linear(128, 1)
 
     def forward(self, x):
         x = self.pool(self.relu(self.conv1(x)))
+        x = self.dropout(x)
         x = self.flatten(x)
         x = self.relu(self.fc1(x))
+        x = self.dropout(x)
         x = self.fc2(x)
         return x
 
 model = CNNModel().to(device)
-optimizer = optim.Adam(model.parameters(), lr=0.001)
+# Regularization with L2
+optimizer = optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-5)
 criterion = nn.MSELoss()
 
 # Training
