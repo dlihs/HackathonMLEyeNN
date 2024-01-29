@@ -20,7 +20,7 @@ data = []
 for index, row in annotations.iterrows():
     for fundus in ['Left_Fundus', 'Right_Fundus']:
         img_path = f"{images_dir}/{row[fundus]}"  
-        processed_image = Old_Preprocessor(img_path)
+        processed_image = Preprocessor(img_path)
         if processed_image is not None:
             data.append((processed_image, row['Age']))
 print("Finished appending")
